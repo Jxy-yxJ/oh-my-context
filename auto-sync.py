@@ -407,15 +407,25 @@ def main():
         print("  pull                                                          Pull from GitHub")
         print("  sync                                                          Pull then push")
         print("  check                                                         Check importance (hybrid)")
-        print("  suggest [text]                                                Suggest if should create")
+        print("  suggest [text]                                                Suggest and create candidate")
+        print("  review [--auto]                                               Review candidate memories")
+        print("  memory list                                                   List all memories")
+        print("  memory stats                                                  Show memory statistics")
         print("  summary                                                       Generate session summary")
         print("  start                                                         Mark session start")
         print("")
-        print("Hybrid Mode Examples:")
-        print("  auto-sync.py check                    # Auto-analyze current work")
-        print("  auto-sync.py suggest '完成了登录功能'  # Check if should create")
-        print("  auto-sync.py start                    # Start session timer")
-        print("  auto-sync.py summary                  # End session, create summary")
+        print("v2.0 Memory OS Commands:")
+        print("  suggest '描述'                    # 创建候选记忆（非直接memory）")
+        print("  review                            # 交互式审核候选")
+        print("  review --auto                     # 自动审核高置信度候选")
+        print("  memory list                       # 列出语义记忆")
+        print("  memory stats                      # Memory统计")
+        print("")
+        print("Examples:")
+        print("  auto-sync.py suggest '完成了登录功能'  # v2: 创建candidate")
+        print("  auto-sync.py review                    # 审核candidate")
+        print("  auto-sync.py start                     # 开始会话")
+        print("  auto-sync.py summary                   # 结束会话，生成summary")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -451,7 +461,22 @@ def main():
 
     elif command == "suggest":
         text = sys.argv[2] if len(sys.argv) > 2 else None
-        suggest_context(text)
+        # v2.0: suggest 现在创建 candidate_memory，不是直接 memory
+        suggest_context_v2(text)
+
+    elif command == "review":
+        auto_mode = "--auto" in sys.argv
+        review_candidates(auto_mode)
+
+    elif command == "memory":
+        subcommand = sys.argv[2] if len(sys.argv) > 2 else "list"
+        if subcommand == "list":
+            list_memories()
+        elif subcommand == "stats":
+            show_memory_stats()
+        else:
+            print(f"Unknown memory subcommand: {subcommand}")
+            print("Use: memory list | memory stats")
 
     elif command == "summary":
         session_summary()
@@ -464,6 +489,191 @@ def main():
     else:
         print(f"Unknown command: {command}")
         print("Run 'auto-sync.py' for help.")
+
+
+# ============================================
+# Memory OS v2.0 Functions
+# ============================================
+
+def suggest_context_v2(user_input=None):
+    """
+    v2.0: suggest 不再直接创建 memory，而是创建 candidate_memory
+    """
+    try:
+        # 导入 v2 模块
+        sys.path.insert(0, str(Path(__file__).parent))
+        from memory_os_v2 import CandidateManager, ReviewManager
+    except ImportError as e:
+        print(f"[Error] 无法加载 Memory OS v2 模块: {e}")
+        print("请确保 memory_os_v2.py 存在于同一目录")
+        return
+
+    print("\n" + "="*60)
+    print("🧠 Memory OS v2.0 - Smart Suggestion")
+    print("="*60)
+
+    # 分析重要性
+    confidence, reason, tags = analyze_importance(user_input)
+
+    print(f"Importance Score: {confidence:.0%}")
+    print(f"Reason: {reason}")
+    print(f"Suggested Tags: {', '.join(tags)}")
+    print("-"*60)
+
+    # 根据分析创建 candidate
+    if confidence >= 0.6:
+        # 确定 candidate 类型
+        candidate_type = "memory"
+        if user_input:
+            if any(kw in user_input.lower() for kw in ["决定", "decide", "选择"]):
+                candidate_type = "decision"
+            elif any(kw in user_input.lower() for kw in ["喜欢", "偏好", "prefer"]):
+                candidate_type = "preference"
+            elif any(kw in user_input.lower() for kw in ["原则", "principle", "总是"]):
+                candidate_type = "principle"
+
+        # 创建 candidate
+        content = user_input if user_input else f"工作记录: {reason}"
+        importance = min(10, max(1, int(confidence * 10)))
+
+        manager = CandidateManager()
+        candidate = manager.create_candidate(
+            content=content,
+            candidate_for=candidate_type,
+            importance_score=importance,
+            confidence_score=confidence,
+            extraction_method="rule",
+            source_session="current-session"
+        )
+
+        print(f"\n✅ 已创建候选记忆 (ID: {candidate.id[:8]})")
+        print(f"   类型: {candidate_type}")
+        print(f"   重要性: {importance}/10")
+        print(f"   置信度: {confidence:.2f}")
+        print(f"\n💡 运行 'auto-sync.py review' 进行审核")
+
+    else:
+        print("\n⏭️  重要性较低，未创建候选")
+        print("   提示: 添加关键词如 '完成' 或 '决定' 可增加重要性")
+
+    print("="*60 + "\n")
+
+
+def review_candidates(auto_mode=False):
+    """
+    审核候选记忆
+    """
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from memory_os_v2 import ReviewManager
+    except ImportError as e:
+        print(f"[Error] 无法加载 Memory OS v2 模块: {e}")
+        return
+
+    print("\n" + "="*60)
+    print("🔍 Memory OS v2.0 - Review Candidates")
+    print("="*60)
+
+    manager = ReviewManager()
+    approved, rejected = manager.review_candidates(auto_mode=auto_mode)
+
+    # 自动推送
+    if approved > 0 or rejected > 0:
+        print("\n📤 同步到 GitHub...")
+        sync_push()
+
+    print("="*60 + "\n")
+
+
+def list_memories():
+    """
+    列出所有语义记忆
+    """
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from memory_os_v2 import SemanticMemoryManager
+    except ImportError as e:
+        print(f"[Error] 无法加载 Memory OS v2 模块: {e}")
+        return
+
+    print("\n" + "="*60)
+    print("📚 Memory OS v2.0 - Semantic Memories")
+    print("="*60)
+
+    manager = SemanticMemoryManager()
+    memories = manager.load_all_memories()
+
+    if not memories:
+        print("\n  暂无语义记忆")
+        print("  运行 'auto-sync.py review' 审核候选")
+    else:
+        # 按 tier 分组
+        by_tier = {}
+        for mem in memories:
+            tier = mem.memory_tier
+            if tier not in by_tier:
+                by_tier[tier] = []
+            by_tier[tier].append(mem)
+
+        for tier in ["core", "active"]:
+            if tier in by_tier:
+                print(f"\n[{tier.upper()}]")
+                for mem in by_tier[tier][:10]:  # 只显示前10个
+                    content_preview = mem.content[:60].replace('\n', ' ')
+                    print(f"  • [{mem.context_type:12}] {content_preview}...")
+
+                if len(by_tier[tier]) > 10:
+                    print(f"  ... 还有 {len(by_tier[tier]) - 10} 个")
+
+    print(f"\n总计: {len(memories)} 个语义记忆")
+    print("="*60 + "\n")
+
+
+def show_memory_stats():
+    """
+    显示记忆统计
+    """
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from memory_os_v2 import get_memory_stats, CandidateManager
+    except ImportError as e:
+        print(f"[Error] 无法加载 Memory OS v2 模块: {e}")
+        return
+
+    print("\n" + "="*60)
+    print("📊 Memory OS v2.0 - Statistics")
+    print("="*60)
+
+    # Semantic Memory 统计
+    stats = get_memory_stats()
+    print("\n[Semantic Memory]")
+    print(f"  总计: {stats['total']} 个")
+    print(f"  Core: {stats['core_count']} 个")
+    print(f"  Active: {stats['active_count']} 个")
+
+    print("\n[按类型]")
+    for mem_type, count in sorted(stats['by_type'].items()):
+        print(f"  {mem_type:15}: {count:3} 个")
+
+    print("\n[按层级]")
+    for tier, count in sorted(stats['by_tier'].items()):
+        print(f"  {tier:15}: {count:3} 个")
+
+    # Candidate 统计
+    candidate_mgr = CandidateManager()
+    pending = candidate_mgr.load_pending_candidates()
+    print(f"\n[Candidate Queue]")
+    print(f"  待审核: {len(pending)} 个")
+
+    if pending:
+        print("\n  运行 'auto-sync.py review' 进行审核")
+
+    print("="*60 + "\n")
+
+
+# ============================================
+# End of Memory OS v2.0 Functions
+# ============================================
 
 
 if __name__ == "__main__":
