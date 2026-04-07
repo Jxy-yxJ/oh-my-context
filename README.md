@@ -5,9 +5,20 @@
 [![GitHub](https://img.shields.io/badge/storage-GitHub-black.svg)](https://github.com)
 [![Memory OS v2](https://img.shields.io/badge/Memory%20OS-v2.0-green.svg)](./MEMORY_OS_DESIGN.md)
 
-跨设备、跨模型、跨Agent的Context同步系统。
+> **一个关于"自我编译"的实验**
+>
+> *"我是谁"不应该只是一个生物学问题，而应该是一个可以 `git clone`、`diff`、`merge` 的工程问题。*
+>
+> 这个项目的终极目标是：**把自己逐步编译成一个可加载的 context**。当有一天我下线了，希望还能：
+> ```bash
+> context pull me
+> # 系统继续正常运行
+> # 也许，还能提个 PR
+> ```
+> 
+> 这不是备份，这是 **version-controlled existence**。
 
-> 在多台设备、多种AI模型、多个Agent之间无缝同步上下文记忆
+---
 
 ## 🆕 Memory OS v2.0
 
