@@ -6,7 +6,7 @@
 [![Memory OS v2](https://img.shields.io/badge/Memory%20OS-v2.0-green.svg)](./MEMORY_OS_DESIGN.md)
 
 > **一个关于"自我编译"的实验**
->
+> 自动上传你的context到github私有仓库，方便跨设备、模型、agent调用
 > *"我是谁"可以不只是一个生物学问题，而可以是 `git clone`、`diff`、`merge` 的工程问题。*
 >
 > 这个项目的终极目标是：**把自己逐步编译成一个可加载的 context**。当有一天我下线了，希望还能：
